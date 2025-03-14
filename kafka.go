@@ -5,14 +5,12 @@ package kafka
 import (
 	"context"
 	"time"
-	"unique"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
 )
 
 type KakfaWriter struct {
-	topic  unique.Handle[string]
 	writer *kafka.Writer
 }
 
@@ -27,7 +25,6 @@ func NewKafkaWriter(borkers, topic, username, password string, timeout time.Dura
 		SASL:        mechanism,
 	}
 	return &KakfaWriter{
-		topic: unique.Make(topic),
 		writer: &kafka.Writer{
 			Addr:         kafka.TCP(borkers),
 			Topic:        topic,
@@ -39,7 +36,6 @@ func NewKafkaWriter(borkers, topic, username, password string, timeout time.Dura
 
 func (k *KakfaWriter) Wrtie(ctx context.Context, _ string, value []byte) error {
 	return k.writer.WriteMessages(ctx, kafka.Message{
-		Topic: k.topic.Value(),
 		Value: value,
 	})
 }

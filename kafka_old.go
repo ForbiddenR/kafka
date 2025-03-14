@@ -11,7 +11,6 @@ import (
 )
 
 type KakfaWriter struct {
-	topic  string
 	writer *kafka.Writer
 }
 
@@ -26,7 +25,6 @@ func NewKafkaWriter(borkers, topic, username, password string, timeout time.Dura
 		SASL:        mechanism,
 	}
 	return &KakfaWriter{
-		topic: topic,
 		writer: &kafka.Writer{
 			Addr:         kafka.TCP(borkers),
 			Topic:        topic,
@@ -38,7 +36,6 @@ func NewKafkaWriter(borkers, topic, username, password string, timeout time.Dura
 
 func (k *KakfaWriter) Wrtie(ctx context.Context, key string, value []byte) error {
 	return k.writer.WriteMessages(ctx, kafka.Message{
-		Topic: k.topic,
 		Key:   []byte(key),
 		Value: value,
 	})

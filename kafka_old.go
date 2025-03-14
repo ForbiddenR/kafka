@@ -15,7 +15,7 @@ type KakfaWriter struct {
 	writer *kafka.Writer
 }
 
-func NewKafkaWriter(topic, borkers, username, password string, timeout time.Duration) *KakfaWriter {
+func NewKafkaWriter(borkers, topic, username, password string, timeout time.Duration) *KakfaWriter {
 	mechanism := &plain.Mechanism{
 		Username: username,
 		Password: password,

@@ -1,18 +1,17 @@
-//go:build go1.23
+//go:build go1.22 && !go1.23
 
 package kafka
 
 import (
 	"context"
 	"time"
-	"unique"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
 )
 
 type KakfaWriter struct {
-	topic  unique.Handle[string]
+	topic  string
 	writer *kafka.Writer
 }
 
@@ -27,7 +26,7 @@ func NewKafkaWriter(topic, borkers, username, password string, timeout time.Dura
 		SASL:        mechanism,
 	}
 	return &KakfaWriter{
-		topic: unique.Make(topic),
+		topic: topic,
 		writer: &kafka.Writer{
 			Addr:         kafka.TCP(borkers),
 			Topic:        topic,
@@ -37,9 +36,10 @@ func NewKafkaWriter(topic, borkers, username, password string, timeout time.Dura
 	}
 }
 
-func (k *KakfaWriter) Wrtie(ctx context.Context, _ string, value []byte) error {
+func (k *KakfaWriter) Wrtie(ctx context.Context, key string, value []byte) error {
 	return k.writer.WriteMessages(ctx, kafka.Message{
-		Topic: k.topic.Value(),
+		Topic: k.topic,
+		Key:   []byte(key),
 		Value: value,
 	})
 }

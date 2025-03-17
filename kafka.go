@@ -34,8 +34,9 @@ func NewKafkaWriter(borkers, topic, username, password string, timeout time.Dura
 	}
 }
 
-func (k *KakfaWriter) Wrtie(ctx context.Context, _ string, value []byte) error {
+func (k *KakfaWriter) Wrtie(ctx context.Context, key string, value []byte) error {
 	return k.writer.WriteMessages(ctx, kafka.Message{
+		Key:   []byte(key),
 		Value: value,
 	})
 }

@@ -27,15 +27,15 @@ func NewKafkaWriter(borkers, topic, username, password string, timeout time.Dura
 	return &KakfaWriter{
 		writer: &kafka.Writer{
 			Addr:         kafka.TCP(borkers),
-			Topic:        topic,
 			Transport:    transport,
 			RequiredAcks: 0,
 		},
 	}
 }
 
-func (k *KakfaWriter) Wrtie(ctx context.Context, key string, value []byte) error {
+func (k *KakfaWriter) Wrtie(ctx context.Context, topic, key string, value []byte) error {
 	return k.writer.WriteMessages(ctx, kafka.Message{
+		Topic: topic,
 		Key:   []byte(key),
 		Value: value,
 	})

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/IBM/sarama"
+	"go.uber.org/zap"
 )
 
 type KafkaWriter struct {
@@ -13,10 +14,13 @@ type KafkaWriter struct {
 	Password string
 	client   sarama.AsyncProducer
 	once     sync.Once
+	logger   zap.Logger
+	terminal chan struct{}
 }
 
 func (w *KafkaWriter) init() {
 	w.once.Do(func() {
+		w.terminal = make(chan struct{})
 		conf := sarama.NewConfig()
 		conf.Producer.Return.Errors = false
 		conf.Net.SASL.User = w.Username
@@ -28,12 +32,28 @@ func (w *KafkaWriter) init() {
 		if err != nil {
 			panic(err)
 		}
+		go func() {
+			for {
+				select {
+				case err := <-w.client.Errors():
+					w.logger.Error("kafka producer error", zap.Error(err))
+				case <-w.terminal:
+					return
+				}
+			}
+		}()
 	})
 }
 
 func (w *KafkaWriter) Close() {
 	if w.client != nil {
 		w.client.Close()
+	}
+	if w.terminal != nil {
+		select {
+		case w.terminal <- struct{}{}:
+		default:
+		}
 	}
 }
 

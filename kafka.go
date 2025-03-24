@@ -12,9 +12,9 @@ type KafkaWriter struct {
 	Addrs    []string
 	Username string
 	Password string
+	Logger   zap.Logger
 	client   sarama.AsyncProducer
 	once     sync.Once
-	logger   zap.Logger
 	terminal chan struct{}
 }
 
@@ -36,7 +36,7 @@ func (w *KafkaWriter) init() {
 			for {
 				select {
 				case err := <-w.client.Errors():
-					w.logger.Error("kafka producer error", zap.Error(err))
+					w.Logger.Error("kafka producer error", zap.Error(err))
 				case <-w.terminal:
 					return
 				}

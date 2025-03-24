@@ -1,42 +1,47 @@
-//go:build go1.23
-
 package kafka
 
 import (
 	"context"
-	"time"
+	"sync"
 
-	"github.com/segmentio/kafka-go"
-	"github.com/segmentio/kafka-go/sasl/plain"
+	"github.com/IBM/sarama"
 )
 
-type KakfaWriter struct {
-	writer *kafka.Writer
+type KafkaWriter struct {
+	Addrs    []string
+	Username string
+	Password string
+	client   sarama.AsyncProducer
+	once     sync.Once
 }
 
-func NewKafkaWriter(borkers, topic, username, password string, timeout time.Duration) *KakfaWriter {
-	mechanism := &plain.Mechanism{
-		Username: username,
-		Password: password,
-	}
-	transport := &kafka.Transport{
-		DialTimeout: timeout,
-		IdleTimeout: timeout,
-		SASL:        mechanism,
-	}
-	return &KakfaWriter{
-		writer: &kafka.Writer{
-			Addr:         kafka.TCP(borkers),
-			Transport:    transport,
-			RequiredAcks: 0,
-		},
-	}
-}
-
-func (k *KakfaWriter) Wrtie(ctx context.Context, topic, key string, value []byte) error {
-	return k.writer.WriteMessages(ctx, kafka.Message{
-		Topic: topic,
-		Key:   []byte(key),
-		Value: value,
+func (w *KafkaWriter) init() {
+	w.once.Do(func() {
+		conf := sarama.NewConfig()
+		conf.Producer.Return.Errors = false
+		conf.Net.SASL.User = w.Username
+		conf.Net.SASL.Password = w.Password
+		conf.Net.SASL.Enable = true
+		conf.Net.SASL.Mechanism = sarama.SASLTypePlaintext
+		var err error
+		w.client, err = sarama.NewAsyncProducer(w.Addrs, conf)
+		if err != nil {
+			panic(err)
+		}
 	})
+}
+
+func (w *KafkaWriter) Close() {
+	if w.client != nil {
+		w.client.Close()
+	}
+}
+
+func (w *KafkaWriter) Write(ctx context.Context, topic, key string, value []byte) {
+	w.init()
+	w.client.Input() <- &sarama.ProducerMessage{
+		Topic: topic,
+		Key:   sarama.StringEncoder(key),
+		Value: sarama.ByteEncoder(value),
+	}
 }

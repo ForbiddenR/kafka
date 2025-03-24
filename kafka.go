@@ -12,7 +12,7 @@ type KafkaWriter struct {
 	Addrs    []string
 	Username string
 	Password string
-	Logger   zap.Logger
+	Logger   *zap.Logger
 	client   sarama.AsyncProducer
 	once     sync.Once
 	terminal chan struct{}

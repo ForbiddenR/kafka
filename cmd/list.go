@@ -4,10 +4,11 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"github.com/ForbiddenR/kafka/client/internal/client"
 	"github.com/spf13/cobra"
 )
 
-var path string
+// var path string
 
 // listCmd represents the list command
 var listCmd = &cobra.Command{
@@ -19,22 +20,12 @@ and usage of using your command. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		
+	RunE: func(cmd *cobra.Command, args []string) error {
+		config := getConfig(cmd.Context())
+		return client.NewKafkaClient(config).List()
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(listCmd)
-
-	listCmd.Flags().StringVarP(&path, "config", "c", "config.yaml", "config file in the system")
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// listCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

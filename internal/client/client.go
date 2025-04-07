@@ -1,8 +1,17 @@
 package client
 
-import "github.com/IBM/sarama"
+import (
+	"errors"
+	"fmt"
+	"maps"
+	"strings"
 
-// var client weak.Pointer[kafka.Conn]
+	"github.com/IBM/sarama"
+)
+
+type Build interface {
+	ConfigToKafkaClient(*KafkaClient)
+}
 
 type KafkaClient struct {
 	Brokers      string
@@ -12,56 +21,57 @@ type KafkaClient struct {
 	Password     string
 }
 
-func (c *KafkaClient) init() {
-	conf := sarama.NewConfig()
-	conf.ClientID = "test"
-	admin, err := sarama.NewClusterAdmin([]string{}, conf)
-	if err != nil {
-		panic(err)
-	}
-	admin.ListTopics()
-	// conn := client.Value()
-	// if conn == nil {
-	// 	mechanism := plain.Mechanism{
-	// 		Username: c.Username,
-	// 		Password: c.Password,
-	// 	}
-	// 	dialer := kafka.Dialer{
-	// 		Timeout:       5 * time.Second,
-	// 		DualStack:     true,
-	// 		SASLMechanism: mechanism,
-	// 	}
-	// 	conn, err := dialer.Dial("tcp", c.Brokers)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	client = weak.Make(conn)
-	// 	runtime.AddCleanup(conn, func(conn *kafka.Conn) { conn.Close() }, conn)
-	// 	return conn
-	// }
-	// return conn
+func NewKafkaClient(b Build) *KafkaClient {
+	kc := &KafkaClient{}
+	b.ConfigToKafkaClient(kc)
+	return kc
+}
+
+func (c KafkaClient) admin() (sarama.ClusterAdmin, error) {
+	cfg := sarama.NewConfig()
+	cfg.ClientID = "admin-client"
+	cfg.Version = sarama.V4_0_0_0
+	return sarama.NewClusterAdmin(strings.Split(c.Brokers, ","), cfg)
 }
 
 func (c *KafkaClient) List() error {
-	// partitions, err := c.init().ReadPartitions()
-	// if err != nil {
-	// 	return err
-	// }
-	// for _, partition := range partitions {
-	// 	fmt.Println(partition.Topic, partition.ID, fmt.Sprintf("leader id: %d, address: %s:%d", partition.Leader.ID, partition.Leader.Host, partition.Leader.Port))
-	// }
+	client, err := c.admin()
+	if err != nil {
+		return err
+	}
+	topics, err := client.ListTopics()
+	if err != nil {
+		return err
+	}
+	for topic, detail := range maps.All(topics) {
+		if !strings.HasPrefix(topic, "__") {
+			fmt.Printf("topic: %s - partition number: %d\n", topic, detail.NumPartitions)
+		}
+	}
 	return nil
 }
 
-func (c *KafkaClient) CreateTopic() error {
-	// return c.init().CreateTopics(kafka.TopicConfig{
-	// 	Topic:         c.Topic,
-	// 	NumPartitions: c.PartitionNum,
-	// })
-	return nil
+func (c *KafkaClient) CreateTopic(topic string, partition int32) error {
+	if topic == "" {
+		return errors.New("topic is empty")
+	}
+	client, err := c.admin()
+	if err != nil {
+		return err
+	}
+	return client.CreateTopic(topic, &sarama.TopicDetail{
+		NumPartitions:     int32(partition),
+		ReplicationFactor: 1,
+	}, false)
 }
 
-func (c *KafkaClient) DeleteTopic() error {
-	// return c.init().DeleteTopics(c.Topic)
-	return nil
+func (c *KafkaClient) DeleteTopic(topic string) error {
+	if topic == "" {
+		return errors.New("topic is empty")
+	}
+	client, err := c.admin()
+	if err != nil {
+		return err
+	}
+	return client.DeleteTopic(topic)
 }

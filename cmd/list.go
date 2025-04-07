@@ -8,18 +8,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// var path string
-
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "A brief description of your command",
+	Short: "Get topic list from kafka but system topics",
 	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+and usage of using your command.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		config := getConfig(cmd.Context())
 		return client.NewKafkaClient(config).List()

@@ -11,7 +11,7 @@ import (
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
-	Short: "A brief description of your command",
+	Short: "Delete topic from kafka",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 

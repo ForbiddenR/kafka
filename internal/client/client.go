@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ForbiddenR/kafka/client/internal/stats"
 	"github.com/IBM/sarama"
 )
 
@@ -76,10 +77,26 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 		return err
 	}
 	closeChan := make(chan struct{})
-	wg := sync.WaitGroup{}
-	wg.Add(2)
+	defer producer.Close()
 
-	for id := range 10000 {
+	wg := sync.WaitGroup{}
+	wg.Add(3)
+
+	s := stats.NewStats()
+	go func() {
+		defer wg.Done()
+		t := time.NewTicker(10 *time.Second)
+		for {
+			select {
+			case <-closeChan:
+				return
+			case <-t.C:
+				fmt.Println("produce rate:", s.Rate())
+			}
+		}
+	}()
+
+	for id := range 20000 {
 		wg.Add(1)
 		go func() {
 			i := 0
@@ -95,6 +112,7 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 					Topic: topic,
 					Value: sarama.StringEncoder(fmt.Sprintf("%s-%d message %d", prefix, id, i)),
 				}
+				s.Inc()
 				i++
 			}
 		}()
@@ -111,6 +129,7 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 			}
 		}
 	}()
+
 	go func() {
 		defer wg.Done()
 		sig := make(chan os.Signal, 1)
@@ -129,8 +148,15 @@ func (c *KafkaClient) Consume(groupId string, topics ...string) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	s := stats.NewStats()
+	go func() {
+		t := time.NewTicker(10 *time.Second)
+		for range t.C {
+			fmt.Println("consume rate:", s.Rate())
+		}
+	}()
 	for {
-		if err := client.Consume(ctx, topics, NewConsumer()); err != nil {
+		if err := client.Consume(ctx, topics, NewConsumer(s)); err != nil {
 			if errors.Is(err, sarama.ErrClosedConsumerGroup) {
 				return err
 			}

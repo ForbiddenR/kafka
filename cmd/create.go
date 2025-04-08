@@ -24,14 +24,14 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		config := getConfig(cmd.Context())
-		return client.NewKafkaClient(config).CreateTopic(topic, partitionNum)
+		conf := getConfig(cmd.Context())
+		return client.NewKafkaClient(conf).CreateTopic(topic, partitionNum)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(createCmd)
 
-	createCmd.Flags().StringVarP(&topic, "topic", "t", "topic", "topic name")
+	createCmd.Flags().StringVarP(&topic, "topic", "t", "", "topic name")
 	createCmd.Flags().Int32VarP(&partitionNum, "partition", "p", 1, "partition number")
 }

@@ -1,10 +1,16 @@
 package client
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"maps"
+	"os"
+	"os/signal"
 	"strings"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/IBM/sarama"
 )
@@ -27,11 +33,97 @@ func NewKafkaClient(b Build) *KafkaClient {
 	return kc
 }
 
-func (c KafkaClient) admin() (sarama.ClusterAdmin, error) {
+func (c *KafkaClient) addSASL(cfg *sarama.Config) {
+	cfg.Net.SASL.Enable = true
+	cfg.Net.SASL.User = c.Username
+	cfg.Net.SASL.Password = c.Password
+	cfg.Net.SASL.Mechanism = sarama.SASLTypePlaintext
+}
+
+func (c *KafkaClient) produce() (sarama.AsyncProducer, error) {
+	cfg := sarama.NewConfig()
+	cfg.ClientID = "producer-client"
+	cfg.Version = sarama.V4_0_0_0
+	if c.Username != "" && c.Password != "" {
+		c.addSASL(cfg)
+	}
+	return sarama.NewAsyncProducer(strings.Split(c.Brokers, ","), cfg)
+}
+
+func (c *KafkaClient) consume(groupId string) (sarama.ConsumerGroup, error) {
+	cfg := sarama.NewConfig()
+	cfg.ClientID = "consumer-client"
+	cfg.Version = sarama.V4_0_0_0
+	if c.Username != "" && c.Password != "" {
+		c.addSASL(cfg)
+	}
+	return sarama.NewConsumerGroup(strings.Split(c.Brokers, ","), groupId, cfg)
+}
+
+func (c *KafkaClient) admin() (sarama.ClusterAdmin, error) {
 	cfg := sarama.NewConfig()
 	cfg.ClientID = "admin-client"
 	cfg.Version = sarama.V4_0_0_0
+	if c.Username != "" && c.Password != "" {
+		c.addSASL(cfg)
+	}
 	return sarama.NewClusterAdmin(strings.Split(c.Brokers, ","), cfg)
+}
+
+func (c *KafkaClient) Produce(topic string) error {
+	producer, err := c.produce()
+	if err != nil {
+		return err
+	}
+	closeChan := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		i := 0
+		defer wg.Done()
+		for {
+			select {
+			case <-closeChan:
+				return
+			default:
+			}
+			time.Sleep(time.Second * 2)
+			producer.Input() <- &sarama.ProducerMessage{
+				Topic: topic,
+				Value: sarama.StringEncoder(fmt.Sprintf("message %d", i)),
+			}
+			i++
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGINT, os.Interrupt, syscall.SIGTERM)
+		<-sig
+		close(closeChan)
+	}()
+	wg.Wait()
+	return nil
+}
+
+func (c *KafkaClient) Consume(groupId string, topics ...string) error {
+	client, err := c.consume(groupId)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	for {
+		if err := client.Consume(ctx, topics, NewConsumer()); err != nil {
+			if errors.Is(err, sarama.ErrClosedConsumerGroup) {
+				return err
+			}
+		}
+		fmt.Println("general error when consuming", err)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+	}
 }
 
 func (c *KafkaClient) List() error {

@@ -1,6 +1,3 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -8,18 +5,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// listCmd represents the list command
-var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "Get topic list from kafka but system topics",
+var produceCmd = &cobra.Command{
+	Use:   "produce",
+	Short: "Produce messages to kafka",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		conf := getConfig(cmd.Context())
-		return client.NewKafkaClient(conf).List()
+		return client.NewKafkaClient(conf).Produce(topic)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(produceCmd)
+
+	produceCmd.Flags().StringVarP(&topic, "topic", "t", "", "topic name")
 }

@@ -5,6 +5,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var prefix string
+
 var produceCmd = &cobra.Command{
 	Use:   "produce",
 	Short: "Produce messages to kafka",
@@ -12,7 +14,7 @@ var produceCmd = &cobra.Command{
 and usage of using your command.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		conf := getConfig(cmd.Context())
-		return client.NewKafkaClient(conf).Produce(topic)
+		return client.NewKafkaClient(conf).Produce(prefix, topic)
 	},
 }
 
@@ -20,4 +22,5 @@ func init() {
 	rootCmd.AddCommand(produceCmd)
 
 	produceCmd.Flags().StringVarP(&topic, "topic", "t", "", "topic name")
+	produceCmd.Flags().StringVarP(&prefix, "prefix", "p", "default_prefix", "message prefix")
 }

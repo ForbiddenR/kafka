@@ -29,7 +29,7 @@ func (c *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim saram
 			if !ok {
 				return errors.New("message channel closed")
 			}
-			fmt.Printf("Message claimed: topic: %s, timestamp: %v, value: %s", message.Topic, message.Timestamp, message.Value)
+			fmt.Printf("Message claimed: topic: %s, timestamp: %v, value: %s\n", message.Topic, message.Timestamp, message.Value)
 			session.MarkMessage(message, "")
 		case <-session.Context().Done():
 			return nil

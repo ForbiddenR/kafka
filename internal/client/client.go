@@ -70,14 +70,14 @@ func (c *KafkaClient) admin() (sarama.ClusterAdmin, error) {
 	return sarama.NewClusterAdmin(strings.Split(c.Brokers, ","), cfg)
 }
 
-func (c *KafkaClient) Produce(topic string) error {
+func (c *KafkaClient) Produce(prefix, topic string) error {
 	producer, err := c.produce()
 	if err != nil {
 		return err
 	}
 	closeChan := make(chan struct{})
 	wg := sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		i := 0
 		defer wg.Done()
@@ -90,9 +90,20 @@ func (c *KafkaClient) Produce(topic string) error {
 			time.Sleep(time.Second * 2)
 			producer.Input() <- &sarama.ProducerMessage{
 				Topic: topic,
-				Value: sarama.StringEncoder(fmt.Sprintf("message %d", i)),
+				Value: sarama.StringEncoder(fmt.Sprintf("%s message %d", prefix, i)),
 			}
 			i++
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-closeChan:
+				return
+			case msg := <- producer.Errors():
+				fmt.Println("producer error", msg.Err)
+			}
 		}
 	}()
 	go func() {

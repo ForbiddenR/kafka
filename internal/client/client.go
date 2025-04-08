@@ -77,31 +77,36 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 	}
 	closeChan := make(chan struct{})
 	wg := sync.WaitGroup{}
-	wg.Add(3)
+	wg.Add(2)
+
+	for id := range 10000 {
+		wg.Add(1)
+		go func() {
+			i := 0
+			defer wg.Done()
+			for {
+				select {
+				case <-closeChan:
+					return
+				default:
+				}
+				time.Sleep(time.Second * 2)
+				producer.Input() <- &sarama.ProducerMessage{
+					Topic: topic,
+					Value: sarama.StringEncoder(fmt.Sprintf("%s-%d message %d", prefix, id, i)),
+				}
+				i++
+			}
+		}()
+	}
+
 	go func() {
-		i := 0
 		defer wg.Done()
 		for {
 			select {
 			case <-closeChan:
 				return
-			default:
-			}
-			time.Sleep(time.Second * 2)
-			producer.Input() <- &sarama.ProducerMessage{
-				Topic: topic,
-				Value: sarama.StringEncoder(fmt.Sprintf("%s message %d", prefix, i)),
-			}
-			i++
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case <-closeChan:
-				return
-			case msg := <- producer.Errors():
+			case msg := <-producer.Errors():
 				fmt.Println("producer error", msg.Err)
 			}
 		}

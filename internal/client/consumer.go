@@ -3,6 +3,7 @@ package client
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/IBM/sarama"
 )
@@ -29,7 +30,7 @@ func (c *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim saram
 			if !ok {
 				return errors.New("message channel closed")
 			}
-			fmt.Printf("Message claimed: topic: %s, timestamp: %v, value: %s\n", message.Topic, message.Timestamp, message.Value)
+			fmt.Printf("Message claimed: topic: %s, timestamp: %v, value: %s\n", message.Topic, message.Timestamp.Format(time.RFC3339), message.Value)
 			session.MarkMessage(message, "")
 		case <-session.Context().Done():
 			return nil

@@ -85,7 +85,7 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 	s := stats.NewStats()
 	go func() {
 		defer wg.Done()
-		t := time.NewTicker(10 *time.Second)
+		t := time.NewTicker(10 * time.Second)
 		for {
 			select {
 			case <-closeChan:
@@ -149,12 +149,14 @@ func (c *KafkaClient) Consume(groupId string, topics ...string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	s := stats.NewStats()
+
 	go func() {
-		t := time.NewTicker(10 *time.Second)
+		t := time.NewTicker(10 * time.Second)
 		for range t.C {
 			fmt.Println("consume rate:", s.Rate())
 		}
 	}()
+
 	for {
 		if err := client.Consume(ctx, topics, NewConsumer(s)); err != nil {
 			if errors.Is(err, sarama.ErrClosedConsumerGroup) {
@@ -181,6 +183,21 @@ func (c *KafkaClient) List() error {
 		if !strings.HasPrefix(topic, "__") {
 			fmt.Printf("topic: %s - partition number: %d\n", topic, detail.NumPartitions)
 		}
+	}
+	return nil
+}
+
+func (c *KafkaClient) Description(topic string) error {
+	client, err := c.admin()
+	if err != nil {
+		return err
+	}
+	groups, err := client.ListConsumerGroups()
+	if err != nil {
+		return err
+	}
+	for group, state := range maps.All(groups) {
+		fmt.Printf("group: %s - state: %s\n", group, state)
 	}
 	return nil
 }

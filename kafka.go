@@ -63,7 +63,7 @@ func (w *KafkaWriter) Write(ctx context.Context, topic, key string, value []byte
 		Topic: topic,
 		Value: sarama.ByteEncoder(value),
 	}
-	if key == "" {
+	if key != "" {
 		message.Key = sarama.StringEncoder(topic)
 	}
 	w.client.Input() <- message

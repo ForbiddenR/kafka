@@ -12,7 +12,6 @@ type Config struct {
 	Brokers  string  `yaml:"brokers"`
 	Username *string `yaml:"username"`
 	Password *string `yaml:"password"`
-	Topic    *string `yaml:"topic"`
 }
 
 func (c *Config) ConfigToKafkaClient(kc *client.KafkaClient) {
@@ -22,9 +21,6 @@ func (c *Config) ConfigToKafkaClient(kc *client.KafkaClient) {
 	}
 	if c.Password != nil {
 		kc.Password = *c.Password
-	}
-	if c.Topic != nil {
-		kc.Topic = *c.Topic
 	}
 }
 

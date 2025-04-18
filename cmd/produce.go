@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"os"
+	"strings"
+
 	"github.com/ForbiddenR/kafka/client/internal/client"
 	"github.com/spf13/cobra"
 )
@@ -14,6 +17,11 @@ var produceCmd = &cobra.Command{
 and usage of using your command.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		conf := getConfig(cmd.Context())
+		if prefix == "" {
+			hostname, _ := os.Hostname()
+			hs := strings.Split(hostname, "-")
+			prefix = hs[len(hs)-1]
+		}
 		return client.NewKafkaClient(conf).Produce(prefix, topic)
 	},
 }

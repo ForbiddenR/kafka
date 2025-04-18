@@ -2,9 +2,12 @@ package client
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
+	mrand "math/rand/v2"
 	"os"
 	"os/signal"
 	"strings"
@@ -26,6 +29,7 @@ type KafkaClient struct {
 	PartitionNum int
 	Username     string
 	Password     string
+	clientId     string
 }
 
 func NewKafkaClient(b Build) *KafkaClient {
@@ -43,7 +47,12 @@ func (c *KafkaClient) addSASL(cfg *sarama.Config) {
 
 func (c *KafkaClient) produce() (sarama.AsyncProducer, error) {
 	cfg := sarama.NewConfig()
-	cfg.ClientID = "producer-client"
+	suffix, err := getSuffix()
+	if err != nil {
+		return nil, err
+	}
+	c.clientId = "producer" + suffix
+	cfg.ClientID = c.clientId
 	cfg.Version = sarama.V4_0_0_0
 	if c.Username != "" && c.Password != "" {
 		c.addSASL(cfg)
@@ -53,7 +62,12 @@ func (c *KafkaClient) produce() (sarama.AsyncProducer, error) {
 
 func (c *KafkaClient) consume(groupId string) (sarama.ConsumerGroup, error) {
 	cfg := sarama.NewConfig()
-	cfg.ClientID = "consumer-client"
+	suffix, err := getSuffix()
+	if err != nil {
+		return nil, err
+	}
+	c.clientId = "consumer" + suffix
+	cfg.ClientID = c.clientId
 	cfg.Version = sarama.V4_0_0_0
 	if c.Username != "" && c.Password != "" {
 		c.addSASL(cfg)
@@ -83,22 +97,26 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 	wg.Add(3)
 
 	s := stats.NewStats()
+
+	log := slog.New(slog.NewTextHandler(os.Stderr, nil)).With(slog.String("client", c.clientId))
+
 	go func() {
 		defer wg.Done()
-		t := time.NewTicker(10 * time.Second)
+		t := time.NewTicker(30 * time.Second)
 		for {
 			select {
 			case <-closeChan:
 				return
 			case <-t.C:
-				fmt.Println("produce rate:", s.Rate())
+				log.Info(fmt.Sprintf("produce rate %g r/s", s.Rate()))
 			}
 		}
 	}()
 
-	for id := range 20000 {
+	for id := range 100000 {
 		wg.Add(1)
 		go func() {
+			time.Sleep(time.Second * time.Duration(mrand.IntN(20)))
 			i := 0
 			defer wg.Done()
 			for {
@@ -107,7 +125,7 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 					return
 				default:
 				}
-				time.Sleep(time.Second * 2)
+				time.Sleep(time.Second * 30)
 				producer.Input() <- &sarama.ProducerMessage{
 					Topic: topic,
 					Value: sarama.StringEncoder(fmt.Sprintf("%s-%d message %d", prefix, id, i)),
@@ -125,7 +143,7 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 			case <-closeChan:
 				return
 			case msg := <-producer.Errors():
-				fmt.Println("producer error", msg.Err)
+				log.Error("produce error", slog.Any("err", msg.Err))
 			}
 		}
 	}()
@@ -150,15 +168,17 @@ func (c *KafkaClient) Consume(groupId string, topics ...string) error {
 	defer cancel()
 	s := stats.NewStats()
 
+	log := slog.New(slog.NewTextHandler(os.Stderr, nil)).With(slog.String("client", c.clientId))
+
 	go func() {
-		t := time.NewTicker(10 * time.Second)
+		t := time.NewTicker(30 * time.Second)
 		for range t.C {
-			fmt.Println("consume rate:", s.Rate())
+			log.Info(fmt.Sprintf("consume rate %g r/s", s.Rate()))
 		}
 	}()
 
 	for {
-		if err := client.Consume(ctx, topics, NewConsumer(s)); err != nil {
+		if err := client.Consume(ctx, topics, NewConsumer(s, log)); err != nil {
 			if errors.Is(err, sarama.ErrClosedConsumerGroup) {
 				return err
 			}
@@ -225,4 +245,13 @@ func (c *KafkaClient) DeleteTopic(topic string) error {
 		return err
 	}
 	return client.DeleteTopic(topic)
+}
+
+func getSuffix() (string, error) {
+	suffix := make([]byte, 6)
+	_, err := rand.Read(suffix)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%X", suffix), nil
 }

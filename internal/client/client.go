@@ -102,7 +102,7 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 
 	go func() {
 		defer wg.Done()
-		t := time.NewTicker(30 * time.Second)
+		t := time.NewTicker(time.Minute)
 		for {
 			select {
 			case <-closeChan:
@@ -113,7 +113,7 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 		}
 	}()
 
-	for id := range 100000 {
+	for id := range 50000 {
 		wg.Add(1)
 		go func() {
 			time.Sleep(time.Second * time.Duration(mrand.IntN(20)))
@@ -125,7 +125,7 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 					return
 				default:
 				}
-				time.Sleep(time.Second * 30)
+				time.Sleep(time.Second * 10)
 				producer.Input() <- &sarama.ProducerMessage{
 					Topic: topic,
 					Value: sarama.StringEncoder(fmt.Sprintf("%s-%d message %d", prefix, id, i)),
@@ -171,7 +171,7 @@ func (c *KafkaClient) Consume(groupId string, topics ...string) error {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil)).With(slog.String("client", c.clientId))
 
 	go func() {
-		t := time.NewTicker(30 * time.Second)
+		t := time.NewTicker(time.Minute)
 		for range t.C {
 			log.Info(fmt.Sprintf("consume rate %g r/s", s.Rate()))
 		}
@@ -183,7 +183,7 @@ func (c *KafkaClient) Consume(groupId string, topics ...string) error {
 				return err
 			}
 		}
-		fmt.Println("general error when consuming", err)
+		log.Error("general error when consuming", slog.Any("err", err))
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

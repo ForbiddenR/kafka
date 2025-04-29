@@ -10,6 +10,7 @@ import (
 	mrand "math/rand/v2"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/ForbiddenR/kafka/client/internal/stats"
 	"github.com/IBM/sarama"
+	"golang.org/x/sync/errgroup"
 )
 
 type Build interface {
@@ -60,6 +62,21 @@ func (c *KafkaClient) produce() (sarama.AsyncProducer, error) {
 	return sarama.NewAsyncProducer(strings.Split(c.Brokers, ","), cfg)
 }
 
+func (c *KafkaClient) fetch() (sarama.Consumer, error) {
+	cfg := sarama.NewConfig()
+	suffix, err := getSuffix()
+	if err != nil {
+		return nil, err
+	}
+	c.clientId = "fetch" + suffix
+	cfg.ClientID = c.clientId
+	cfg.Version = sarama.V4_0_0_0
+	if c.Username != "" && c.Password != "" {
+		c.addSASL(cfg)
+	}
+	return sarama.NewConsumer(strings.Split(c.Brokers, ","), cfg)
+}
+
 func (c *KafkaClient) consume(groupId string) (sarama.ConsumerGroup, error) {
 	cfg := sarama.NewConfig()
 	suffix, err := getSuffix()
@@ -69,6 +86,7 @@ func (c *KafkaClient) consume(groupId string) (sarama.ConsumerGroup, error) {
 	c.clientId = "consumer" + suffix
 	cfg.ClientID = c.clientId
 	cfg.Version = sarama.V4_0_0_0
+	cfg.Consumer.Offsets.AutoCommit.Interval = time.Second * 3
 	if c.Username != "" && c.Password != "" {
 		c.addSASL(cfg)
 	}
@@ -157,6 +175,43 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 	}()
 	wg.Wait()
 	return nil
+}
+
+func (c *KafkaClient) Fetch(key, topic string, dur time.Duration) error {
+	client, err := c.fetch()
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	partitions, err := client.Partitions(topic)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	eg, cx := errgroup.WithContext(ctx)
+	for partition := range slices.Values(partitions) {
+		eg.Go(func() error {
+			partition, err := client.ConsumePartition(topic, partition, sarama.OffsetOldest)
+			if err != nil {
+				return err
+			}
+			defer partition.Close()
+			for {
+				select {
+				case <-cx.Done():
+					return cx.Err()
+				case msg := <-partition.Messages():
+					if string(msg.Key) == key && time.Since(msg.Timestamp) < dur {
+						fmt.Printf("%s %s. %s\n", msg.Timestamp.Format(time.RFC3339), string(msg.Value), string(msg.Key))
+					}
+				}
+			}
+		})
+	}
+	return eg.Wait()
 }
 
 func (c *KafkaClient) Consume(groupId string, topics ...string) error {

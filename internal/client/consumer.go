@@ -45,6 +45,7 @@ func (c *Consumer) Cleanup(sarama.ConsumerGroupSession) error {
 }
 
 func (c *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+	c.log.Info("Starting to consume", slog.Int64("initial offset", claim.InitialOffset()), slog.Int("partition", int(claim.Partition())))
 	for {
 		select {
 		case message, ok := <-claim.Messages():

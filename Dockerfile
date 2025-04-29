@@ -13,4 +13,4 @@ WORKDIR /app
 COPY --from=base /app/kafka kafka
 COPY config.yaml config.yaml
 
-CMD ["./kafka", "produce", "-t", "back_pressure_test"]
+CMD ["./kafka", "consume", "-t", "back_pressure_test"]

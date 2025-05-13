@@ -7,6 +7,13 @@ import (
 	"go.uber.org/zap"
 )
 
+type KafkaWriter interface {
+	Write(ctx context.Context, topic string, value []byte)
+	WriteWithKey(ctx context.Context, topic, key string, value []byte)
+	Start() error
+	Close()
+}
+
 type kafkaWriter struct {
 	addrs    []string
 	username string

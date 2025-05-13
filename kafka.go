@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"strings"
 
 	"github.com/IBM/sarama"
 	"go.uber.org/zap"
@@ -23,8 +24,9 @@ type kafkaWriter struct {
 	terminal chan struct{}
 }
 
-func NewKafkaWriter(username, password string, logger *zap.Logger) *kafkaWriter {
+func NewKafkaWriter(addrs, username, password string, logger *zap.Logger) *kafkaWriter {
 	return &kafkaWriter{
+		addrs:    strings.Split(addrs, ","),
 		username: username,
 		password: password,
 		logger:   logger,

@@ -2,50 +2,55 @@ package kafka
 
 import (
 	"context"
-	"sync"
 
 	"github.com/IBM/sarama"
 	"go.uber.org/zap"
 )
 
-type KafkaWriter struct {
-	Addrs    []string
-	Username string
-	Password string
-	Logger   *zap.Logger
+type kafkaWriter struct {
+	addrs    []string
+	username string
+	password string
+	logger   *zap.Logger
 	client   sarama.AsyncProducer
-	once     sync.Once
 	terminal chan struct{}
 }
 
-func (w *KafkaWriter) init() {
-	w.once.Do(func() {
-		w.terminal = make(chan struct{})
-		conf := sarama.NewConfig()
-		conf.Producer.Return.Errors = false
-		conf.Net.SASL.User = w.Username
-		conf.Net.SASL.Password = w.Password
-		conf.Net.SASL.Enable = true
-		conf.Net.SASL.Mechanism = sarama.SASLTypePlaintext
-		var err error
-		w.client, err = sarama.NewAsyncProducer(w.Addrs, conf)
-		if err != nil {
-			panic(err)
-		}
-		go func() {
-			for {
-				select {
-				case err := <-w.client.Errors():
-					w.Logger.Error("kafka producer error", zap.Error(err))
-				case <-w.terminal:
-					return
-				}
-			}
-		}()
-	})
+func NewKafkaWriter(username, password string, logger *zap.Logger) *kafkaWriter {
+	return &kafkaWriter{
+		username: username,
+		password: password,
+		logger:   logger,
+		terminal: make(chan struct{}),
+	}
 }
 
-func (w *KafkaWriter) Close() {
+func (w *kafkaWriter) Start() error {
+	conf := sarama.NewConfig()
+	conf.Producer.Return.Errors = false
+	conf.Net.SASL.User = w.username
+	conf.Net.SASL.Password = w.password
+	conf.Net.SASL.Enable = true
+	conf.Net.SASL.Mechanism = sarama.SASLTypePlaintext
+	var err error
+	w.client, err = sarama.NewAsyncProducer(w.addrs, conf)
+	if err != nil {
+		return err
+	}
+	go func() {
+		for {
+			select {
+			case err := <-w.client.Errors():
+				w.logger.Error("kafka producer", zap.Error(err))
+			case <-w.terminal:
+				w.logger.Warn("kafka client closing...")
+			}
+		}
+	}()
+	return nil
+}
+
+func (w *kafkaWriter) Close() {
 	if w.client != nil {
 		w.client.Close()
 	}
@@ -57,8 +62,15 @@ func (w *KafkaWriter) Close() {
 	}
 }
 
-func (w *KafkaWriter) Write(ctx context.Context, topic, key string, value []byte) {
-	w.init()
+func (w *kafkaWriter) Write(ctx context.Context, topic string, value []byte) {
+	message := &sarama.ProducerMessage{
+		Topic: topic,
+		Value: sarama.ByteEncoder(value),
+	}
+	w.client.Input() <- message
+}
+
+func (w *kafkaWriter) WriteWithKey(ctx context.Context, topic, key string, value []byte) {
 	message := &sarama.ProducerMessage{
 		Topic: topic,
 		Value: sarama.ByteEncoder(value),

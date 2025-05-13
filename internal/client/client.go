@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ForbiddenR/kafka/client/internal/statistics"
 	"github.com/ForbiddenR/kafka/client/internal/stats"
 	"github.com/IBM/sarama"
 	"golang.org/x/sync/errgroup"
@@ -103,7 +104,7 @@ func (c *KafkaClient) admin() (sarama.ClusterAdmin, error) {
 	return sarama.NewClusterAdmin(strings.Split(c.Brokers, ","), cfg)
 }
 
-func (c *KafkaClient) Produce(prefix, topic string) error {
+func (c *KafkaClient) Produce(suffix, topic string) error {
 	producer, err := c.produce()
 	if err != nil {
 		return err
@@ -131,7 +132,7 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 		}
 	}()
 
-	for id := range 50000 {
+	for range 50000 {
 		wg.Add(1)
 		go func() {
 			time.Sleep(time.Second * time.Duration(mrand.IntN(20)))
@@ -144,9 +145,14 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 				default:
 				}
 				time.Sleep(time.Second * 10)
+				m, err := statistics.NewStatisticsData(suffix).ToJson()
+				if err != nil {
+					log.Error("failed to marshal", "error", err)
+					continue
+				}
 				producer.Input() <- &sarama.ProducerMessage{
 					Topic: topic,
-					Value: sarama.StringEncoder(fmt.Sprintf("%s-%d message %d", prefix, id, i)),
+					Value: sarama.ByteEncoder(m),
 				}
 				s.Inc()
 				i++
@@ -250,15 +256,30 @@ func (c *KafkaClient) List() error {
 	if err != nil {
 		return err
 	}
+	groups, err := client.ListConsumerGroups()
+	if err != nil {
+		return err
+	}
+
+	for group, detail := range maps.All(groups) {
+		fmt.Printf("group: %s - detail: %s\n", group, detail)
+	}
+
 	topics, err := client.ListTopics()
 	if err != nil {
 		return err
 	}
 	for topic, detail := range maps.All(topics) {
 		if !strings.HasPrefix(topic, "__") {
-			fmt.Printf("topic: %s - partition number: %d\n", topic, detail.NumPartitions)
+			fmt.Printf("topic: %s\n", topic)
+			fmt.Printf("partition number: %d; factor: %d\n", detail.NumPartitions, detail.ReplicationFactor)
+			for s, v := range maps.All(detail.ReplicaAssignment) {
+				fmt.Printf("%d is assigned to %d\n", s, v)
+				fmt.Println()
+			}
 		}
 	}
+
 	return nil
 }
 

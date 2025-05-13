@@ -6,6 +6,7 @@ import (
 	"maps"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ForbiddenR/kafka/client/internal/stats"
 	"github.com/IBM/sarama"
@@ -46,6 +47,7 @@ func (c *Consumer) Cleanup(sarama.ConsumerGroupSession) error {
 
 func (c *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	c.log.Info("Starting to consume", slog.Int64("initial offset", claim.InitialOffset()), slog.Int("partition", int(claim.Partition())))
+	counter := 0
 	for {
 		select {
 		case message, ok := <-claim.Messages():
@@ -55,6 +57,11 @@ func (c *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim saram
 			// c.log.Info("Message consumed", slog.String("topic", message.Topic),
 			// slog.String("time", message.Timestamp.Format(time.RFC3339)),
 			// slog.String("value", string(message.Value)))
+			// if counter % 10 == 0 {
+			c.log.Info("message consumed", "topic", message.Topic, "time", message.Timestamp.Format(time.RFC3339), "value", string(message.Value))
+			// }
+			counter++
+
 			session.MarkMessage(message, "")
 			c.s.Inc()
 		case <-session.Context().Done():

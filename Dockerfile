@@ -1,4 +1,4 @@
-FROM golang:1.24.2-alpine3.21 AS base
+FROM golang:1.24.3-alpine3.21 AS base
 
 WORKDIR /app
 
@@ -12,5 +12,7 @@ WORKDIR /app
 
 COPY --from=base /app/kafka kafka
 COPY config.yaml config.yaml
+COPY command.line command.line
+COPY protocol.line protocol.line
 
-CMD ["./kafka", "consume", "-t", "back_pressure_test"]
+CMD ["./kafka", "statistics", "test"]

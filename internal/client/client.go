@@ -116,7 +116,7 @@ func (c *KafkaClient) Produce(prefix, topic string) error {
 
 	s := stats.NewStats()
 
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil)).With(slog.String("client", c.clientId))
+	log := slog.New(slog.NewTextHandler(os.Stderr, nil)).With("client", c.clientId)
 
 	go func() {
 		defer wg.Done()

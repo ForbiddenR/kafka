@@ -14,6 +14,7 @@ var listCmd = &cobra.Command{
 	Short: "Get topic list from kafka but system topics",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command.`,
+	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		conf := getConfig(cmd.Context())
 		return client.NewKafkaClient(conf).List()

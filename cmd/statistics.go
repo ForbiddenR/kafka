@@ -8,9 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var prefix string
 
-var produceCmd = &cobra.Command{
+var statisticsCmd = &cobra.Command{
 	Use:   "produce",
 	Short: "Produce messages to kafka",
 	Long: `A longer description that spans multiple lines and likely contains examples
@@ -28,6 +27,6 @@ and usage of using your command.`,
 }
 
 func init() {
-	rootCmd.AddCommand(produceCmd)
-	produceCmd.Flags().StringVarP(&prefix, "prefix", "p", "default_prefix", "message prefix")
+	rootCmd.AddCommand(statisticsCmd)
+	// produceCmd.Flags().StringVarP(&prefix, "prefix", "p", "default_prefix", "message prefix")
 }

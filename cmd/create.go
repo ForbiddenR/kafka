@@ -18,20 +18,15 @@ var createCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Crate a topic in kafka",
 	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+and usage of using your command.`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		conf := getConfig(cmd.Context())
-		return client.NewKafkaClient(conf).CreateTopic(topic, partitionNum)
+		return client.NewKafkaClient(conf).CreateTopic(args[0], partitionNum)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(createCmd)
-
-	createCmd.Flags().StringVarP(&topic, "topic", "t", "", "topic name")
 	createCmd.Flags().Int32VarP(&partitionNum, "partition", "p", 1, "partition number")
 }

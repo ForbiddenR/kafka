@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/IBM/sarama"
@@ -10,6 +11,7 @@ import (
 
 type KafkaWriter interface {
 	Write(ctx context.Context, topic string, value []byte)
+	Write2Json(context.Context, string, any)
 	WriteWithKey(ctx context.Context, topic, key string, value []byte)
 	Start() error
 	Close()
@@ -69,6 +71,15 @@ func (w *kafkaWriter) Close() {
 		default:
 		}
 	}
+}
+
+func (w *kafkaWriter) Write2Json(ctx context.Context, topic string, value any) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		w.logger.Error("kafka write2json marshal error", zap.Error(err))
+		return
+	}
+	w.Write(ctx, topic, data)
 }
 
 func (w *kafkaWriter) Write(ctx context.Context, topic string, value []byte) {

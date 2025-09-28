@@ -38,6 +38,7 @@ func NewKafkaWriter(addrs, username, password string, logger *zap.Logger) *kafka
 }
 
 func (w *kafkaWriter) Start() error {
+	sarama.Logger = &emptyLogger{}
 	conf := sarama.NewConfig()
 	conf.Producer.Return.Errors = false
 	conf.Net.SASL.User = w.username
@@ -96,3 +97,11 @@ func (w *kafkaWriter) WriteWithKey(ctx context.Context, topic, key string, value
 	}
 	w.client.Input() <- message
 }
+
+type emptyLogger struct{}
+
+func (d *emptyLogger) Print(v ...any) {}
+
+func (d *emptyLogger) Printf(format string, v ...any) {}
+
+func (d *emptyLogger) Println(v ...any) {}
